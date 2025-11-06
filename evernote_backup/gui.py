@@ -1,5 +1,6 @@
 """Evernote Backup GUI - Windows application interface."""
 
+import io
 import logging
 import sys
 import threading
@@ -7,6 +8,13 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Optional
+
+# Fix for GUI mode: ensure stdout/stderr are not None
+# This is necessary when running as a GUI app on Windows
+if sys.stdout is None:
+    sys.stdout = io.StringIO()
+if sys.stderr is None:
+    sys.stderr = io.StringIO()
 
 from evernote_backup import cli_app
 from evernote_backup.cli_app_util import ProgramTerminatedError
