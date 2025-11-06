@@ -1,4 +1,5 @@
 import functools
+import logging
 import time
 from http.client import HTTPException
 from typing import Any, Callable, Optional, cast
@@ -12,10 +13,12 @@ from evernote_backup.evernote_client_api_tokenized import (
     TokenizedUserStoreClient,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_RETRY_MAX = 3
 DEFAULT_RETRY_DELAY = 0.5
 DEFAULT_RETRY_BACKOFF_FACTOR = 2.0
-DEFAULT_RETRY_EXCEPTIONS = (HTTPException, ConnectionError)
+DEFAULT_RETRY_EXCEPTIONS = (HTTPException, ConnectionError, EOFError)
 
 
 class TBinaryProtocolHotfix(TBinaryProtocol):
@@ -171,9 +174,17 @@ class RetryableMixin:
                     except self._retry_exceptions as e:
                         last_exception = e
                         if attempt < self._retry_max:
+                            logger.warning(
+                                f"Network error on attempt {attempt + 1}/{self._retry_max + 1}: "
+                                f"{type(e).__name__}: {e}. Retrying in {delay:.1f}s..."
+                            )
                             time.sleep(delay)
                             delay *= self._retry_backoff_factor
                         else:
+                            logger.error(
+                                f"Network error after {self._retry_max + 1} attempts: "
+                                f"{type(e).__name__}: {e}"
+                            )
                             raise last_exception
 
             return wrapper
