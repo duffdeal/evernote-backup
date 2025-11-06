@@ -49,6 +49,10 @@ changelog = "https://github.com/vzhd1701/evernote-backup/blob/master/CHANGELOG.m
 
 [project.scripts]
 evernote-backup = "evernote_backup.cli:main"
+evernote-backup-gui = "evernote_backup.gui:main"
+
+[project.gui-scripts]
+evernote-backup-gui = "evernote_backup.gui:main"
 
 [tool.poetry]
 include = ["CHANGELOG.md"]

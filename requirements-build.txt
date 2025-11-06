@@ -1,0 +1,2 @@
+# Requirements for building the Windows GUI executable
+pyinstaller>=6.0.0
