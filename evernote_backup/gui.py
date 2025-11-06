@@ -17,6 +17,36 @@ class FakeTTY(io.StringIO):
     by making the code think it's running in an interactive terminal.
     """
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._log_widget = None
+
+    def set_log_widget(self, widget: Optional['scrolledtext.ScrolledText']) -> None:
+        """Set the log widget to write output to."""
+        self._log_widget = widget
+
+    def write(self, s: str) -> int:
+        """Write to both the buffer and the log widget if available."""
+        result = super().write(s)
+        if self._log_widget and s.strip():  # Only log non-empty strings
+            try:
+                self._log_widget.after(0, self._append_to_widget, s)
+            except Exception:
+                pass  # Ignore errors if widget is not available
+        return result
+
+    def _append_to_widget(self, msg: str) -> None:
+        """Append text to widget in main thread."""
+        try:
+            self._log_widget.configure(state="normal")
+            self._log_widget.insert(tk.END, msg)
+            if not msg.endswith('\n'):
+                self._log_widget.insert(tk.END, '\n')
+            self._log_widget.see(tk.END)
+            self._log_widget.configure(state="disabled")
+        except Exception:
+            pass  # Ignore errors if widget is not available
+
     def isatty(self) -> bool:
         """Return True to indicate this is a TTY."""
         return True
@@ -557,7 +587,14 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        # Add handler to root logger to capture all evernote_backup module logs
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget to capture click.echo() messages
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.setup_log)
 
         def run_init() -> None:
             """Run init in thread."""
@@ -568,6 +605,14 @@ class EvernoteBackupGUI:
                 user = self.username_var.get() if auth_method == "password" else None
                 password = self.password_var.get() if auth_method == "password" else None
                 oauth_port = int(self.oauth_port_var.get())
+
+                if auth_method == "oauth":
+                    logger.info("Starting OAuth authentication...")
+                    logger.info("Your browser will open for authorization.")
+                    logger.info("Please complete the authorization in your browser.")
+                    logger.info(f"The callback will be received on localhost:{oauth_port}")
+                else:
+                    logger.info("Starting password authentication...")
 
                 cli_app.init_db(
                     database=db_path,
@@ -590,7 +635,10 @@ class EvernoteBackupGUI:
                 messagebox.showerror("Error", f"Failed to initialize database:\n{e}")
             finally:
                 self.operation_running = False
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                # Disconnect stdout from log widget
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_init, daemon=True)
         thread.start()
@@ -616,7 +664,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.sync_log)
 
         # Start progress bar
         self.sync_progress.start()
@@ -650,7 +704,9 @@ class EvernoteBackupGUI:
             finally:
                 self.operation_running = False
                 self.sync_progress.stop()
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_sync, daemon=True)
         thread.start()
@@ -678,7 +734,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.export_log)
 
         # Start progress bar
         self.export_progress.start()
@@ -709,7 +771,9 @@ class EvernoteBackupGUI:
             finally:
                 self.operation_running = False
                 self.export_progress.stop()
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_export, daemon=True)
         thread.start()
@@ -735,7 +799,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.tools_log)
 
         def run_reauth() -> None:
             """Run reauth in thread."""
@@ -761,7 +831,9 @@ class EvernoteBackupGUI:
                 messagebox.showerror("Error", f"Failed to reauthorize:\n{e}")
             finally:
                 self.operation_running = False
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_reauth, daemon=True)
         thread.start()
@@ -783,7 +855,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.tools_log)
 
         def run_check() -> None:
             """Run check in thread."""
@@ -810,7 +888,9 @@ class EvernoteBackupGUI:
                 self.status_var.set(f"Error: {e}")
                 messagebox.showerror("Error", f"Failed to check database:\n{e}")
             finally:
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_check, daemon=True)
         thread.start()
@@ -832,7 +912,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.tools_log)
 
         def run_list() -> None:
             """Run list in thread."""
@@ -854,7 +940,9 @@ class EvernoteBackupGUI:
                 self.status_var.set(f"Error: {e}")
                 messagebox.showerror("Error", f"Failed to list notebooks:\n{e}")
             finally:
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_list, daemon=True)
         thread.start()
@@ -871,7 +959,13 @@ class EvernoteBackupGUI:
         log_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        logger.addHandler(log_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # Connect stdout to log widget
+        if isinstance(sys.stdout, FakeTTY):
+            sys.stdout.set_log_widget(self.tools_log)
 
         def run_test() -> None:
             """Run test in thread."""
@@ -890,7 +984,9 @@ class EvernoteBackupGUI:
                 self.status_var.set(f"Error: {e}")
                 messagebox.showerror("Error", f"Failed to connect:\n{e}")
             finally:
-                logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
+                if isinstance(sys.stdout, FakeTTY):
+                    sys.stdout.set_log_widget(None)
 
         thread = threading.Thread(target=run_test, daemon=True)
         thread.start()
