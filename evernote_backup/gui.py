@@ -9,12 +9,30 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Optional
 
-# Fix for GUI mode: ensure stdout/stderr are not None
+
+class FakeTTY(io.StringIO):
+    """A StringIO that pretends to be a TTY for GUI mode.
+
+    This allows OAuth and other interactive features to work in GUI mode
+    by making the code think it's running in an interactive terminal.
+    """
+
+    def isatty(self) -> bool:
+        """Return True to indicate this is a TTY."""
+        return True
+
+
+# Fix for GUI mode: ensure stdout/stderr are not None and pretend to be TTY
 # This is necessary when running as a GUI app on Windows
 if sys.stdout is None:
-    sys.stdout = io.StringIO()
+    sys.stdout = FakeTTY()
 if sys.stderr is None:
-    sys.stderr = io.StringIO()
+    sys.stderr = FakeTTY()
+if not sys.stdout.isatty():
+    # Replace with FakeTTY if not already a TTY
+    sys.stdout = FakeTTY()
+if not sys.stderr.isatty():
+    sys.stderr = FakeTTY()
 
 from evernote_backup import cli_app
 from evernote_backup.cli_app_util import ProgramTerminatedError
