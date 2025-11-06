@@ -77,6 +77,25 @@ from evernote_backup.config_defaults import (
     SYNC_MAX_DOWNLOAD_WORKERS,
 )
 
+# Import click for context management
+import click
+
+
+def create_click_context():
+    """Create a minimal Click context for GUI mode.
+
+    This is necessary because cli_app functions expect to be running
+    in a Click context to access parameters like 'verbose' and 'quiet'.
+    """
+    @click.command()
+    @click.option('--verbose', is_flag=True, default=False)
+    @click.option('--quiet', is_flag=True, default=False)
+    def dummy_command(verbose, quiet):
+        pass
+
+    return dummy_command.make_context('gui', ['--quiet'])
+
+
 # Set up logging for GUI
 logging.basicConfig(
     level=logging.INFO,
@@ -614,19 +633,22 @@ class EvernoteBackupGUI:
                 else:
                     logger.info("Starting password authentication...")
 
-                cli_app.init_db(
-                    database=db_path,
-                    auth_user=user,
-                    auth_password=password,
-                    auth_oauth_port=oauth_port,
-                    auth_oauth_host=OAUTH_HOST,
-                    auth_token=None,
-                    backend=backend,
-                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
-                    use_system_ssl_ca=False,
-                    custom_api_data=None,
-                    force=force,
-                )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    cli_app.init_db(
+                        database=db_path,
+                        auth_user=user,
+                        auth_password=password,
+                        auth_oauth_port=oauth_port,
+                        auth_oauth_host=OAUTH_HOST,
+                        auth_token=None,
+                        backend=backend,
+                        network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                        use_system_ssl_ca=False,
+                        custom_api_data=None,
+                        force=force,
+                    )
                 self.status_var.set("Database initialized successfully!")
                 messagebox.showinfo("Success", "Database initialized successfully!")
             except Exception as e:
@@ -685,16 +707,19 @@ class EvernoteBackupGUI:
                 memory_limit = int(self.memory_limit_var.get())
                 include_tasks = self.include_tasks_var.get()
 
-                cli_app.sync(
-                    database=db_path,
-                    max_chunk_results=max_chunk,
-                    max_download_workers=workers,
-                    download_cache_memory_limit=memory_limit,
-                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
-                    use_system_ssl_ca=False,
-                    include_tasks=include_tasks,
-                    token=None,
-                )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    cli_app.sync(
+                        database=db_path,
+                        max_chunk_results=max_chunk,
+                        max_download_workers=workers,
+                        download_cache_memory_limit=memory_limit,
+                        network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                        use_system_ssl_ca=False,
+                        include_tasks=include_tasks,
+                        token=None,
+                    )
                 self.status_var.set("Sync completed successfully!")
                 messagebox.showinfo("Success", "Sync completed successfully!")
             except Exception as e:
@@ -750,18 +775,21 @@ class EvernoteBackupGUI:
             self.operation_running = True
             self.status_var.set("Exporting notes...")
             try:
-                cli_app.export(
-                    database=db_path,
-                    output_path=output_path,
-                    single_notes=self.single_notes_var.get(),
-                    include_trash=self.include_trash_var.get(),
-                    no_export_date=self.no_export_date_var.get(),
-                    add_guid=False,
-                    add_metadata=False,
-                    overwrite=self.overwrite_var.get(),
-                    notebooks=(),
-                    tags=(),
-                )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    cli_app.export(
+                        database=db_path,
+                        output_path=output_path,
+                        single_notes=self.single_notes_var.get(),
+                        include_trash=self.include_trash_var.get(),
+                        no_export_date=self.no_export_date_var.get(),
+                        add_guid=False,
+                        add_metadata=False,
+                        overwrite=self.overwrite_var.get(),
+                        notebooks=(),
+                        tags=(),
+                    )
                 self.status_var.set("Export completed successfully!")
                 messagebox.showinfo("Success", f"Export completed successfully!\nOutput: {output_path}")
             except Exception as e:
@@ -812,17 +840,20 @@ class EvernoteBackupGUI:
             self.operation_running = True
             self.status_var.set("Reauthorizing...")
             try:
-                cli_app.reauth(
-                    database=db_path,
-                    auth_user=None,
-                    auth_password=None,
-                    auth_oauth_port=OAUTH_LOCAL_PORT,
-                    auth_oauth_host=OAUTH_HOST,
-                    auth_token=None,
-                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
-                    use_system_ssl_ca=False,
-                    custom_api_data=None,
-                )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    cli_app.reauth(
+                        database=db_path,
+                        auth_user=None,
+                        auth_password=None,
+                        auth_oauth_port=OAUTH_LOCAL_PORT,
+                        auth_oauth_host=OAUTH_HOST,
+                        auth_token=None,
+                        network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                        use_system_ssl_ca=False,
+                        custom_api_data=None,
+                    )
                 self.status_var.set("Reauthorization successful!")
                 messagebox.showinfo("Success", "Reauthorization completed successfully!")
             except Exception as e:
@@ -869,19 +900,22 @@ class EvernoteBackupGUI:
             try:
                 from evernote_backup.note_checker import check_notes
 
-                with cli_app.get_storage(db_path) as storage:
-                    issues = check_notes(storage)
-                    if issues:
-                        logger.warning(f"Found {len(issues)} issues in database")
-                        for issue in issues:
-                            logger.warning(f"  - {issue}")
-                        messagebox.showwarning(
-                            "Issues Found",
-                            f"Found {len(issues)} issues in database. See log for details.",
-                        )
-                    else:
-                        logger.info("Database check completed successfully - no issues found")
-                        messagebox.showinfo("Success", "Database check completed successfully!")
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    with cli_app.get_storage(db_path) as storage:
+                        issues = check_notes(storage)
+                        if issues:
+                            logger.warning(f"Found {len(issues)} issues in database")
+                            for issue in issues:
+                                logger.warning(f"  - {issue}")
+                            messagebox.showwarning(
+                                "Issues Found",
+                                f"Found {len(issues)} issues in database. See log for details.",
+                            )
+                        else:
+                            logger.info("Database check completed successfully - no issues found")
+                            messagebox.showinfo("Success", "Database check completed successfully!")
                 self.status_var.set("Check completed")
             except Exception as e:
                 logger.exception("Error checking database")
@@ -926,14 +960,17 @@ class EvernoteBackupGUI:
             try:
                 from evernote_backup.note_lister import list_notebooks
 
-                with cli_app.get_storage(db_path) as storage:
-                    notebooks = list_notebooks(storage)
-                    logger.info(f"Found {len(notebooks)} notebooks:")
-                    for notebook in notebooks:
-                        logger.info(f"  - {notebook.name} ({notebook.guid})")
-                    messagebox.showinfo(
-                        "Notebooks", f"Found {len(notebooks)} notebooks. See log for details."
-                    )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    with cli_app.get_storage(db_path) as storage:
+                        notebooks = list_notebooks(storage)
+                        logger.info(f"Found {len(notebooks)} notebooks:")
+                        for notebook in notebooks:
+                            logger.info(f"  - {notebook.name} ({notebook.guid})")
+                        messagebox.showinfo(
+                            "Notebooks", f"Found {len(notebooks)} notebooks. See log for details."
+                        )
                 self.status_var.set("List completed")
             except Exception as e:
                 logger.exception("Error listing notebooks")
@@ -971,11 +1008,14 @@ class EvernoteBackupGUI:
             """Run test in thread."""
             self.status_var.set("Testing connection...")
             try:
-                cli_app.manage_ping(
-                    backend=BACKEND,
-                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
-                    use_system_ssl_ca=False,
-                )
+                # Create Click context for GUI mode
+                ctx = create_click_context()
+                with ctx:
+                    cli_app.manage_ping(
+                        backend=BACKEND,
+                        network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                        use_system_ssl_ca=False,
+                    )
                 logger.info("Connection test successful!")
                 self.status_var.set("Connection test successful")
                 messagebox.showinfo("Success", "Connection to Evernote servers successful!")
