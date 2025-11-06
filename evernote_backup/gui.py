@@ -547,10 +547,13 @@ class EvernoteBackupGUI:
                     database=db_path,
                     auth_user=user,
                     auth_password=password,
-                    oauth_port=oauth_port,
-                    oauth_host=OAUTH_HOST,
+                    auth_oauth_port=oauth_port,
+                    auth_oauth_host=OAUTH_HOST,
+                    auth_token=None,
                     backend=backend,
-                    network_error_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    use_system_ssl_ca=False,
+                    custom_api_data=None,
                     force=force,
                 )
                 self.status_var.set("Database initialized successfully!")
@@ -606,9 +609,11 @@ class EvernoteBackupGUI:
                     database=db_path,
                     max_chunk_results=max_chunk,
                     max_download_workers=workers,
-                    download_cache_memory_limit_mb=memory_limit,
-                    network_error_retry_count=NETWORK_ERROR_RETRY_COUNT,
-                    sync_tasks=include_tasks,
+                    download_cache_memory_limit=memory_limit,
+                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    use_system_ssl_ca=False,
+                    include_tasks=include_tasks,
+                    token=None,
                 )
                 self.status_var.set("Sync completed successfully!")
                 messagebox.showinfo("Success", "Sync completed successfully!")
@@ -659,11 +664,15 @@ class EvernoteBackupGUI:
             try:
                 cli_app.export(
                     database=db_path,
-                    target=output_path,
+                    output_path=output_path,
                     single_notes=self.single_notes_var.get(),
-                    export_trash=self.include_trash_var.get(),
+                    include_trash=self.include_trash_var.get(),
                     no_export_date=self.no_export_date_var.get(),
+                    add_guid=False,
+                    add_metadata=False,
                     overwrite=self.overwrite_var.get(),
+                    notebooks=(),
+                    tags=(),
                 )
                 self.status_var.set("Export completed successfully!")
                 messagebox.showinfo("Success", f"Export completed successfully!\nOutput: {output_path}")
@@ -709,7 +718,14 @@ class EvernoteBackupGUI:
             try:
                 cli_app.reauth(
                     database=db_path,
-                    network_error_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    auth_user=None,
+                    auth_password=None,
+                    auth_oauth_port=OAUTH_LOCAL_PORT,
+                    auth_oauth_host=OAUTH_HOST,
+                    auth_token=None,
+                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    use_system_ssl_ca=False,
+                    custom_api_data=None,
                 )
                 self.status_var.set("Reauthorization successful!")
                 messagebox.showinfo("Success", "Reauthorization completed successfully!")
@@ -835,9 +851,10 @@ class EvernoteBackupGUI:
             """Run test in thread."""
             self.status_var.set("Testing connection...")
             try:
-                cli_app.ping(
+                cli_app.manage_ping(
                     backend=BACKEND,
-                    network_error_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    network_retry_count=NETWORK_ERROR_RETRY_COUNT,
+                    use_system_ssl_ca=False,
                 )
                 logger.info("Connection test successful!")
                 self.status_var.set("Connection test successful")
