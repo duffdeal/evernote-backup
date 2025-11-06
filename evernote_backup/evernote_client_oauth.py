@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from enum import IntEnum
@@ -9,6 +10,8 @@ from requests_oauthlib.oauth1_session import TokenMissing, TokenRequestDenied
 
 from evernote_backup.cli_app_util import is_inside_docker
 from evernote_backup.evernote_client import EvernoteClientBase
+
+logger = logging.getLogger(__name__)
 
 
 class OAuthDeclinedError(Exception):
@@ -63,12 +66,23 @@ class EvernoteOAuthCallbackHandler:
         self.server_port = oauth_port
 
     def get_oauth_url(self) -> str:
-        return self.client.get_authorize_url(
-            f"http://{self.server_host}:{self.server_port}/oauth_callback"
-        )
+        callback_url = f"http://{self.server_host}:{self.server_port}/oauth_callback"
+        logger.info(f"OAuth callback URL: {callback_url}")
+        auth_url = self.client.get_authorize_url(callback_url)
+        logger.info(f"OAuth authorization URL generated")
+        return auth_url
 
     def wait_for_token(self) -> str:
-        return self.client.get_access_token(self._wait_for_callback())
+        logger.info("Waiting for OAuth callback...")
+        callback_response = self._wait_for_callback()
+        logger.info(f"OAuth callback received: {callback_response[:100]}...")
+        try:
+            token = self.client.get_access_token(callback_response)
+            logger.info("OAuth access token obtained successfully")
+            return token
+        except Exception as e:
+            logger.error(f"Failed to get access token: {e}")
+            raise
 
     def _wait_for_callback(self) -> str:
         if is_inside_docker():
@@ -106,28 +120,48 @@ class EvernoteOAuthClient(EvernoteClientBase):
         self._session: Optional[OAuth1Session] = None
 
     def get_authorize_url(self, callback_url: str) -> str:
+        logger.debug(f"Creating OAuth session with callback: {callback_url}")
         self._session = OAuth1Session(
             client_key=self.client_key,
             client_secret=self.client_secret,
             callback_uri=callback_url,
         )
 
-        self._session.fetch_request_token(self._get_endpoint("oauth"))
+        request_token_url = self._get_endpoint("oauth")
+        logger.debug(f"Fetching request token from: {request_token_url}")
+        self._session.fetch_request_token(request_token_url)
+        logger.debug("Request token obtained")
 
-        return str(self._session.authorization_url(self._get_endpoint("OAuth.action")))
+        auth_url = self._get_endpoint("OAuth.action")
+        logger.debug(f"Generating authorization URL from: {auth_url}")
+        return str(self._session.authorization_url(auth_url))
 
     def get_access_token(self, callback_response_raw: str) -> str:
         if not self._session:
+            logger.error("OAuth session not initialized")
             raise RuntimeError("Session used before initialization")
 
+        logger.debug(f"Parsing callback response: {callback_response_raw}")
         try:
             self._session.parse_authorization_response(callback_response_raw)
-        except TokenMissing:
+            logger.debug("Callback response parsed successfully")
+        except TokenMissing as e:
+            logger.error(f"Token missing in callback response: {e}")
             raise OAuthDeclinedError
+        except Exception as e:
+            logger.error(f"Error parsing callback response: {e}", exc_info=True)
+            raise
 
+        access_token_url = self._get_endpoint("oauth")
+        logger.debug(f"Fetching access token from: {access_token_url}")
         try:
-            access_token = self._session.fetch_access_token(self._get_endpoint("oauth"))
-        except TokenRequestDenied:
+            access_token = self._session.fetch_access_token(access_token_url)
+            logger.debug("Access token fetched successfully")
+        except TokenRequestDenied as e:
+            logger.error(f"Token request denied: {e}")
             raise OAuthDeclinedError
+        except Exception as e:
+            logger.error(f"Error fetching access token: {e}", exc_info=True)
+            raise
 
         return str(access_token["oauth_token"])
