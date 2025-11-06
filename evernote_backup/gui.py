@@ -609,7 +609,8 @@ class EvernoteBackupGUI:
         # Add handler to root logger to capture all evernote_backup module logs
         root_logger = logging.getLogger()
         root_logger.addHandler(log_handler)
-        root_logger.setLevel(logging.INFO)
+        # Set to DEBUG for OAuth operations to see detailed flow
+        root_logger.setLevel(logging.DEBUG)
 
         # Connect stdout to log widget to capture click.echo() messages
         if isinstance(sys.stdout, FakeTTY):
@@ -630,6 +631,10 @@ class EvernoteBackupGUI:
                     logger.info("Your browser will open for authorization.")
                     logger.info("Please complete the authorization in your browser.")
                     logger.info(f"The callback will be received on localhost:{oauth_port}")
+                    logger.info("")
+                    logger.info("IMPORTANT: After authorizing in your browser,")
+                    logger.info("wait for the browser tab to show 'You can close this tab now...'")
+                    logger.info("before closing it. This ensures the callback is received.")
                 else:
                     logger.info("Starting password authentication...")
 
