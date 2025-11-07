@@ -13,6 +13,13 @@ from evernote_backup.evernote_client_api_tokenized import (
     TokenizedUserStoreClient,
 )
 
+# Import Evernote exception types
+try:
+    from evernote.edam.error.ttypes import EDAMSystemException, EDAMErrorCode
+except ImportError:
+    EDAMSystemException = None  # type: ignore
+    EDAMErrorCode = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_RETRY_MAX = 3
@@ -186,6 +193,27 @@ class RetryableMixin:
                                 f"{type(e).__name__}: {e}"
                             )
                             raise last_exception
+                    except Exception as e:
+                        # Check for Evernote rate limit error
+                        if EDAMSystemException and isinstance(e, EDAMSystemException):
+                            if e.errorCode == EDAMErrorCode.RATE_LIMIT_REACHED:
+                                wait_time = e.rateLimitDuration
+                                logger.warning(
+                                    f"Evernote API rate limit reached. "
+                                    f"Waiting {wait_time} seconds before retrying..."
+                                )
+                                # Show progress every 60 seconds
+                                remaining = wait_time
+                                while remaining > 0:
+                                    if remaining % 60 == 0 or remaining <= 10:
+                                        logger.info(f"Rate limit: {remaining} seconds remaining...")
+                                    time.sleep(min(1, remaining))
+                                    remaining -= 1
+                                logger.info("Rate limit wait complete, retrying...")
+                                # Retry the request
+                                continue
+                        # If not a rate limit error, re-raise
+                        raise
 
             return wrapper
 
