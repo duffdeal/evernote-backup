@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Optional
@@ -97,11 +98,38 @@ def create_click_context():
 
 
 # Set up logging for GUI
+# Create logs directory
+log_dir = Path.home() / ".evernote-backup" / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Clean up old log files (keep last 30 days)
+try:
+    import time
+    current_time = time.time()
+    for old_log in log_dir.glob("gui_*.log"):
+        if old_log.stat().st_mtime < current_time - (30 * 24 * 60 * 60):
+            old_log.unlink()
+except Exception:
+    pass  # Ignore cleanup errors
+
+# Create log file with timestamp
+log_file = log_dir / f"gui_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+# Configure logging to both file and console
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 logger = logging.getLogger(__name__)
+logger.info("=" * 80)
+logger.info("Evernote Backup GUI Started")
+logger.info(f"Log file: {log_file}")
+logger.info(f"Log directory: {log_dir}")
+logger.info("=" * 80)
 
 
 class LogHandler(logging.Handler):
@@ -174,6 +202,14 @@ class EvernoteBackupGUI:
             self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W
         )
         status_bar.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
+
+        # Log file info bar
+        log_info_text = f"Logs saved to: {log_file.parent}"
+        log_info_bar = ttk.Label(
+            self.root, text=log_info_text, relief=tk.SUNKEN, anchor=tk.W, foreground="blue"
+        )
+        log_info_bar.grid(row=2, column=0, sticky="ew", padx=5, pady=2)
+        log_info_bar.bind("<Button-1>", lambda e: self.open_log_folder())
 
         # Track running operations
         self.operation_running = False
@@ -1035,6 +1071,22 @@ class EvernoteBackupGUI:
 
         thread = threading.Thread(target=run_test, daemon=True)
         thread.start()
+
+    def open_log_folder(self) -> None:
+        """Open the log folder in file explorer."""
+        import subprocess
+        import platform
+
+        try:
+            if platform.system() == "Windows":
+                subprocess.run(["explorer", str(log_dir)], check=False)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", str(log_dir)], check=False)
+            else:  # Linux
+                subprocess.run(["xdg-open", str(log_dir)], check=False)
+        except Exception as e:
+            logger.error(f"Failed to open log folder: {e}")
+            messagebox.showinfo("Log Location", f"Logs are saved to:\n{log_dir}")
 
 
 def main() -> None:
